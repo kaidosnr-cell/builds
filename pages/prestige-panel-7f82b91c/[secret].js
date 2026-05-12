@@ -1,27 +1,26 @@
-import { useRouter } from 'next/router';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Layout from '../../components/Layout';
 import Head from 'next/head';
 
-export default function AdminPage() {
-    const router = useRouter();
-    const { secret: urlSecret } = router.query;
-    const [isAuthorized, setIsAuthorized] = useState(false);
-    const [secret, setSecret] = useState('');
-    
-    // [SECURITY] Strict URL-based authorization
-    useEffect(() => {
-        const MASTER_SECRET = 'ADVANCED-UI-PRESTIGE-SECRET-2026';
-        if (urlSecret && urlSecret === MASTER_SECRET) {
-            setIsAuthorized(true);
-            setSecret(urlSecret);
-        }
-    }, [urlSecret]);
+export async function getServerSideProps(context) {
+    const { secret } = context.params;
+    const MASTER_SECRET = process.env.MASTER_SECRET || 'ADVANCED-UI-PRESTIGE-SECRET-2026';
 
-    if (!isAuthorized && urlSecret) {
-        return <div className="h-screen flex items-center justify-center text-zinc-700 font-mono">404 | Page Not Found</div>;
+    // [SECURITY] Verification happens entirely on the SERVER.
+    // The client NEVER sees the MASTER_SECRET or the Admin code unless the key is correct.
+    if (secret !== MASTER_SECRET) {
+        return {
+            notFound: true, // This returns a REAL 404 to the browser
+        };
     }
 
+    return {
+        props: { verifiedSecret: secret }, 
+    };
+}
+
+export default function AdminPage({ verifiedSecret }) {
+    const [secret] = useState(verifiedSecret);
     const [count, setCount] = useState(1);
     const [days, setDays] = useState(30);
     const [generatedKeys, setGeneratedKeys] = useState([]);
@@ -75,14 +74,13 @@ export default function AdminPage() {
                         </h2>
 
                         <div className="space-y-6">
-                            <div>
-                                <label className="block text-[11px] font-black text-zinc-500 uppercase tracking-widest mb-2">Master Secret</label>
+                            <div className="opacity-50 pointer-events-none">
+                                <label className="block text-[11px] font-black text-zinc-500 uppercase tracking-widest mb-2">Authenticated Session</label>
                                 <input 
                                     type="password"
                                     value={secret}
-                                    onChange={(e) => setSecret(e.target.value)}
-                                    placeholder="Enter Admin Secret..."
-                                    className="w-full bg-[#08080A] border border-zinc-800 rounded-xl px-4 py-3 text-white focus:border-purple-500 outline-none transition-all"
+                                    readOnly
+                                    className="w-full bg-[#08080A] border border-zinc-800 rounded-xl px-4 py-3 text-white outline-none transition-all"
                                 />
                             </div>
 
