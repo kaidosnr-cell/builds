@@ -37,16 +37,31 @@ const Layout = ({ children }) => {
   ];
 
   const [user, setUser] = React.useState('OWNER_MODE');
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    const key = localStorage.getItem('prestige_key');
+    if (!key) {
+      router.push('/login');
+      return;
+    }
+
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_state', key: 'PRS-9921-X882-K001' })
+        body: JSON.stringify({ action: 'get_state', key: key })
     })
     .then(res => res.json())
-    .then(data => setUser(data.username || 'OWNER_MODE'));
+    .then(data => {
+      setUser(data.username || 'OWNER_MODE');
+      setLoading(false);
+    })
+    .catch(() => {
+      router.push('/login');
+    });
   }, []);
+
+  if (loading) return null; // Prevent flicker while checking auth
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#0D0D10', color: 'white' }}>

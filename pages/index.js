@@ -7,18 +7,21 @@ export default function Home() {
   const [stats, setStats] = useState({ configs: 0, expires: 'Lifetime' });
 
   useEffect(() => {
+    const key = localStorage.getItem('prestige_key');
+    if (!key) return;
+
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_state', key: 'PRS-9921-X882-K001' })
+        body: JSON.stringify({ action: 'get_state', key: key })
     })
     .then(res => res.json())
     .then(data => {
-        setUser(data.username);
+        setUser(data.username || 'PRESTIGE USER');
         setActivity(data.recentActivity || []);
         setStats({
             configs: data.configs?.length || 0,
-            expires: data.expires
+            expires: data.expires || 'Lifetime'
         });
     });
   }, []);
