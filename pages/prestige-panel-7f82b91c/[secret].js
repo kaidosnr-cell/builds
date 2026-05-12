@@ -1,9 +1,27 @@
-import { useState } from 'react';
-import Layout from '../components/Layout';
+import { useRouter } from 'next/router';
+import { useState, useEffect } from 'react';
+import Layout from '../../components/Layout';
 import Head from 'next/head';
 
 export default function AdminPage() {
+    const router = useRouter();
+    const { secret: urlSecret } = router.query;
+    const [isAuthorized, setIsAuthorized] = useState(false);
     const [secret, setSecret] = useState('');
+    
+    // [SECURITY] Strict URL-based authorization
+    useEffect(() => {
+        const MASTER_SECRET = 'ADVANCED-UI-PRESTIGE-SECRET-2026';
+        if (urlSecret && urlSecret === MASTER_SECRET) {
+            setIsAuthorized(true);
+            setSecret(urlSecret);
+        }
+    }, [urlSecret]);
+
+    if (!isAuthorized && urlSecret) {
+        return <div className="h-screen flex items-center justify-center text-zinc-700 font-mono">404 | Page Not Found</div>;
+    }
+
     const [count, setCount] = useState(1);
     const [days, setDays] = useState(30);
     const [generatedKeys, setGeneratedKeys] = useState([]);
