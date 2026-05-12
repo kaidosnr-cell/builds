@@ -3,6 +3,8 @@ import WebpackObfuscator from 'webpack-obfuscator';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // [SECURITY] Force Webpack over Turbopack to support the Obfuscation layer
+  transpilePackages: ['webpack-obfuscator', 'javascript-obfuscator'],
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       config.plugins.push(
