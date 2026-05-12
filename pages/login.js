@@ -7,13 +7,26 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    // Simulate auth
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 1500);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'login_web', key })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        localStorage.setItem('prestige_key', key);
+        router.push('/dashboard');
+      } else {
+        alert(data.message || 'Invalid license key.');
+      }
+    } catch (err) {
+      alert('Authentication failed.');
+    }
+    setLoading(false);
   };
 
   return (
