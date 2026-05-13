@@ -18,9 +18,12 @@ export default async function handler(req, res) {
         const { action, key: rawKey, username, hwid: rawHwid, salt, payload } = req.body;
         const hwid = rawHwid ? crypto.createHash('sha256').update(rawHwid).digest('hex') : null;
         
-        // Normalize key: Trim and ensure PRS- prefix
+        // Normalize key: Trim and ensure PRS- prefix without doubling up
         let key = rawKey ? rawKey.trim().toUpperCase() : null;
-        if (key && !key.startsWith('PRS-')) {
+        if (key) {
+            // Remove any existing PRS- or KEYAUTH- prefix first
+            key = key.replace(/^(PRS-|KEYAUTH-)/, '');
+            // Then ensure it has the PRS- prefix
             key = 'PRS-' + key;
         }
 
