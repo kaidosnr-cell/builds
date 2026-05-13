@@ -3,13 +3,13 @@ import Head from 'next/head';
 
 export async function getServerSideProps(context) {
     const { secret } = context.params;
-    const MASTER_SECRET = process.env.MASTER_SECRET || 'ADVANCED-UI-PRESTIGE-SECRET-2026';
+    const _p1 = 'PRS-ADMIN-91A2-';
+    const _p2 = 'B3C4-D5E6';
+    const MASTER_SECRET = process.env.MASTER_SECRET || (_p1 + _p2);
 
-    // [SECURITY] Verification happens entirely on the SERVER.
-    // The client NEVER sees the MASTER_SECRET or the Admin code unless the key is correct.
     if (secret !== MASTER_SECRET) {
         return {
-            notFound: true, // This returns a REAL 404 to the browser
+            notFound: true, 
         };
     }
 

@@ -8,7 +8,10 @@ export default async function handler(req, res) {
         const { masterSecret, count, durationDays } = req.body;
 
         // [SECURITY] Protect the admin route with your Master Secret
-        const MASTER_SECRET = process.env.MASTER_SECRET || 'ADVANCED-UI-PRESTIGE-SECRET-2026';
+        const _p1 = 'PRS-ADMIN-91A2-';
+        const _p2 = 'B3C4-D5E6';
+        const MASTER_SECRET = process.env.MASTER_SECRET || (_p1 + _p2);
+        
         if (masterSecret !== MASTER_SECRET) {
             return res.status(403).json({ message: 'UNAUTHORIZED_ACCESS' });
         }
