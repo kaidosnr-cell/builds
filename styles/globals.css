@@ -4,9 +4,9 @@
   --background: #0D0D10;
   --sidebar: #0E0E12;
   --foreground: #FFFFFF;
-  --accent: #A708FF;
-  --accent-dark: #52047D;
-  --accent-glow: rgba(167, 8, 255, 0.3);
+  --accent: #8376FC;
+  --accent-dark: #4A43A3;
+  --accent-glow: rgba(131, 118, 252, 0.3);
   --glass: rgba(255, 255, 255, 0.02);
   --glass-border: rgba(255, 255, 255, 0.04);
   --text-dim: #505058;
@@ -53,7 +53,7 @@ button, a {
 }
 
 .prestige-gradient {
-  background: linear-gradient(135deg, #A708FF 0%, #E0B0FF 50%, #FFFFFF 100%);
+  background: linear-gradient(135deg, #8376FC 0%, #A49AFF 50%, #FFFFFF 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-size: 200% auto;
@@ -73,7 +73,7 @@ button, a {
 }
 
 .glass-card:hover {
-  border-color: rgba(167, 8, 255, 0.2);
+  border-color: rgba(131, 118, 252, 0.2);
   background: rgba(255, 255, 255, 0.04);
 }
 
@@ -123,7 +123,7 @@ button, a {
 }
 
 .sidebar-item-active {
-  background: linear-gradient(90deg, rgba(167, 8, 255, 0.15) 0%, rgba(167, 8, 255, 0.02) 100%);
+  background: linear-gradient(90deg, rgba(131, 118, 252, 0.15) 0%, rgba(131, 118, 252, 0.02) 100%);
   position: relative;
 }
 

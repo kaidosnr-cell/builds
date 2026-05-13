@@ -9,7 +9,7 @@ export default function CloudConfigs() {
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_state', key: 'PRS-9921-X882-K001' })
+        body: JSON.stringify({ action: 'get_state', key: localStorage.getItem('prestige_key') })
     })
     .then(res => res.json())
     .then(data => {
@@ -22,7 +22,7 @@ export default function CloudConfigs() {
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_config', key: 'PRS-9921-X882-K001', payload: { id } })
+        body: JSON.stringify({ action: 'delete_config', key: localStorage.getItem('prestige_key'), payload: { id } })
     })
     .then(res => res.json())
     .then(data => setConfigs(data.configs));
@@ -32,7 +32,7 @@ export default function CloudConfigs() {
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'set_default_config', key: 'PRS-9921-X882-K001', payload: { id } })
+        body: JSON.stringify({ action: 'set_default_config', key: localStorage.getItem('prestige_key'), payload: { id } })
     })
     .then(res => res.json())
     .then(data => setConfigs(data.configs));

@@ -4,12 +4,14 @@ import { useRouter } from 'next/router';
 
 export default function Login() {
   const [key, setKey] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       const res = await fetch('/api/auth', {
         method: 'POST',
@@ -21,10 +23,10 @@ export default function Login() {
         localStorage.setItem('prestige_key', key);
         router.push('/dashboard');
       } else {
-        alert(data.message || 'Invalid license key.');
+        setError(data.message || 'Invalid license key.');
       }
     } catch (err) {
-      alert('Authentication failed.');
+      setError('Authentication failed. Check your connection.');
     }
     setLoading(false);
   };
@@ -97,6 +99,19 @@ export default function Login() {
               onBlur={e => e.target.style.borderColor = 'var(--glass-border)'}
             />
           </div>
+
+          {error && (
+            <div className="animate-fade" style={{ 
+              color: '#FF4C4C', 
+              fontSize: '13px', 
+              fontWeight: '600', 
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              textShadow: '0 0 10px rgba(255, 76, 76, 0.3)'
+            }}>
+              {error}
+            </div>
+          )}
 
           <button 
             type="submit" 

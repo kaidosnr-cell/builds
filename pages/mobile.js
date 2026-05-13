@@ -14,7 +14,7 @@ export default function MobileConnect() {
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_state', key: 'PRS-9921-X882-K001' })
+        body: JSON.stringify({ action: 'get_state', key: localStorage.getItem('prestige_key') })
     })
     .then(res => res.json())
     .then(data => {
@@ -50,7 +50,7 @@ export default function MobileConnect() {
     fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'update_mobile', key: 'PRS-9921-X882-K001', payload: { masterSwitch: val } })
+        body: JSON.stringify({ action: 'update_mobile', key: localStorage.getItem('prestige_key'), payload: { masterSwitch: val } })
     })
     .then(res => res.json())
     .then(data => setSession(data.session));
@@ -61,7 +61,7 @@ export default function MobileConnect() {
         fetch('/api/auth', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'destruct', key: 'PRS-9921-X882-K001' })
+            body: JSON.stringify({ action: 'destruct', key: localStorage.getItem('prestige_key') })
         })
         .then(() => {
             setIsPaired(false);

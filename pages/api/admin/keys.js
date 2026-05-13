@@ -1,11 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 
 export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
-        const { masterSecret, count, durationDays } = req.body;
+        const { masterSecret } = req.body;
 
         // [SECURITY] Protect the admin route with your Master Secret
         const MASTER_SECRET = process.env.MASTER_SECRET || 'ADVANCED-UI-PRESTIGE-SECRET-2026';
@@ -17,31 +16,16 @@ export default async function handler(req, res) {
             return res.status(500).json({ message: 'MISSING_SERVICE_ROLE_KEY' });
         }
 
-        // Use SERVICE_ROLE_KEY for admin actions to bypass RLS
+        // Use SERVICE_ROLE_KEY to see everything
         const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL,
             process.env.SUPABASE_SERVICE_ROLE_KEY
         );
 
-        const keys = [];
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + (durationDays || 30));
-
-        for (let i = 0; i < (count || 1); i++) {
-            const randomHex = crypto.randomBytes(6).toString('hex').toUpperCase();
-            const formattedKey = `PRS-${randomHex.slice(0, 4)}-${randomHex.slice(4, 8)}-${randomHex.slice(8, 12)}`;
-            
-            keys.push({
-                key: formattedKey,
-                expires: expiryDate.toISOString(),
-                username: 'Prestige User'
-            });
-        }
-
         const { data, error } = await supabaseAdmin
             .from('licenses')
-            .insert(keys)
-            .select();
+            .select('*')
+            .order('created_at', { ascending: false });
 
         if (error) return res.status(500).json({ message: 'DB_ERROR: ' + error.message });
 
