@@ -83,14 +83,18 @@ async function logToDatabase(identifier, action, details, ipInfo = null) {
 
         const { ip, vpnFlag } = ipInfo || { ip: 'unknown', vpnFlag: '' };
         
-        // Only set license_key if the identifier looks like a key (starts with PRS-)
         const licenseKey = (identifier && identifier.startsWith('PRS-')) ? identifier : null;
+
+        // Mask the identifier if it's a key
+        const maskedIdentifier = (identifier && identifier.startsWith('PRS-')) 
+            ? identifier.substring(0, 4) + '****' + identifier.substring(identifier.length - 2)
+            : identifier;
 
         await supabaseAdmin.from('activity_logs').insert({
             id: crypto.randomUUID(),
             license_key: licenseKey,
             action: action,
-            details: `${identifier}: ${details} | IP: ${ip}${vpnFlag}`
+            details: `${maskedIdentifier}: ${details} | IP: ${ip}${vpnFlag}`
         });
     } catch (err) {
         console.error('[Logger Error]', err);
