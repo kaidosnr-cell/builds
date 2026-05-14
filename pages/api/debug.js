@@ -11,19 +11,20 @@ export default async function handler(req, res) {
     try {
         const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         
-        // Check for Kaidosnr specifically
-        const { data: specific, error: specErr } = await supabase
-            .from('licenses')
-            .select('*')
-            .ilike('username', 'Kaidosnr')
-            .maybeSingle();
+        // List all tables in the public schema
+        const { data: tables, error: tableErr } = await supabase
+            .from('pg_catalog.pg_tables')
+            .select('tablename')
+            .eq('schemaname', 'public');
 
-        if (specErr) {
-            dbStatus = 'ERROR';
-            dbError = specErr.message;
+        if (tableErr) {
+            // Fallback for restricted access
+            const { data: sample, error: sampleErr } = await supabase.from('licenses').select('*').limit(1);
+            dbStatus = sampleErr ? 'ERROR: ' + sampleErr.message : 'OK';
+            sampleUser = sample;
         } else {
             dbStatus = 'OK';
-            sampleUser = specific;
+            sampleUser = { tables: tables.map(t => t.tablename) };
         }
     } catch (e) {
         dbStatus = 'CRASH';
