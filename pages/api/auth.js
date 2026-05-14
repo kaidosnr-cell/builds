@@ -66,14 +66,22 @@ export default async function handler(req, res) {
             case 'login_loader':
                 if (!username) return res.status(400).json({ status: 'error', message: 'USERNAME_REQUIRED' });
                 
+                console.log(`[AUTH DEBUG] Login attempt for: ${username}`);
+
                 // Case-insensitive lookup supporting both username and license key in the 'users' table
+                // Wrapping values in quotes to handle special characters/spaces
                 const { data: user, error: userError } = await supabaseAdmin
                     .from('users')
                     .select('*')
-                    .or(`username.ilike.${username},license_key.ilike.${username}`)
+                    .or(`username.ilike."${username}",license_key.ilike."${username}"`)
                     .single();
 
-                if (userError || !user) return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
+                if (userError || !user) {
+                    console.error(`[AUTH DEBUG] User not found: ${username}`, userError);
+                    return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
+                }
+                
+                console.log(`[AUTH DEBUG] User found: ${user.username} (ID: ${user.id})`);
                 
                 // Website accounts use password hash, but loader currently trusts the binary for convenience.
                 // We verify if they have an active subscription (owns_cheat === 1).
