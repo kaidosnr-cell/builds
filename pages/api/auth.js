@@ -289,6 +289,79 @@ export default async function handler(req, res) {
                 }
                 return res.status(200).json({ status: 'success' });
 
+            case 'login_web':
+                if (!key) return res.status(400).json({ status: 'error', message: 'KEY_REQUIRED' });
+                
+                // Web logins are simpler - just verify the key exists and is active
+                const { data: webUser, error: webErr } = await supabaseAdmin
+                    .from('licenses')
+                    .select('*')
+                    .eq('key', key)
+                    .single();
+
+                if (webErr || !webUser) {
+                    return res.status(401).json({ status: 'error', message: 'INVALID_KEY' });
+                }
+
+                if (webUser.status === 'DISABLED') {
+                    return res.status(403).json({ status: 'error', message: 'ACCOUNT_DISABLED' });
+                }
+
+                return res.status(200).json({ 
+                    status: 'success', 
+                    username: webUser.username,
+                    role: 'User'
+                });
+
+            case 'get_state':
+                if (!key) return res.status(400).json({ status: 'error', message: 'KEY_REQUIRED' });
+
+                // 1. Fetch user/license data
+                const { data: stateUser, error: stateErr } = await supabaseAdmin
+                    .from('licenses')
+                    .select('*')
+                    .eq('key', key)
+                    .single();
+
+                if (stateErr || !stateUser) {
+                    return res.status(404).json({ status: 'error', message: 'USER_NOT_FOUND' });
+                }
+
+                // 2. Fetch recent activity (last 5 logs)
+                const { data: logs } = await supabaseAdmin
+                    .from('activity_logs')
+                    .select('*')
+                    .eq('license_key', key)
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                const formattedLogs = (logs || []).map(l => ({
+                    id: l.id,
+                    action: l.action,
+                    details: l.details.split('|')[0].trim(), // Remove IP/VPN info for frontend
+                    time: new Date(l.created_at).toLocaleTimeString()
+                }));
+
+                // 3. Fetch Cloud Configs
+                const { data: dbConfigs } = await supabaseAdmin
+                    .from('configs')
+                    .select('*')
+                    .eq('license_key', key);
+
+                return res.status(200).json({
+                    status: stateUser.status || 'ACTIVE',
+                    username: stateUser.username || 'Prestige User',
+                    expires: stateUser.expires || 'Lifetime',
+                    hwid: stateUser.hwid || null,
+                    recentActivity: formattedLogs,
+                    configs: dbConfigs || [],
+                    mobileSession: {
+                        isConnected: stateUser.is_mobile_connected || false,
+                        masterSwitch: stateUser.mobile_master_switch || false,
+                        injected: stateUser.status === 'INJECTED'
+                    }
+                });
+
             default:
                 return res.status(400).json({ status: 'error', message: `UNKNOWN_ACTION_${action}` });
         }

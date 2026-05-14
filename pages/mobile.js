@@ -38,7 +38,7 @@ export default function MobileConnect() {
   const handlePairing = (e) => {
     e.preventDefault();
     // In a real app, this would verify with the server/loader
-    if (pairingCode.toUpperCase() === 'MZE-PAIR') {
+    if (pairingCode.toUpperCase() === 'PRS-PAIR') {
         setIsPaired(true);
         setError('');
     } else {
@@ -85,11 +85,11 @@ export default function MobileConnect() {
         {!isPaired ? (
             <div style={{ maxWidth: '500px', margin: '100px auto', background: '#0E0E12', padding: '50px', borderRadius: '20px', textAlign: 'center' }}>
                 <div style={{ 
-                    width: '60px', height: '60px', background: 'rgba(167, 8, 255, 0.05)', 
+                    width: '60px', height: '60px', 
                     borderRadius: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'var(--accent)', margin: '0 auto 30px'
                 }}>
-                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </div>
                 <h3 className="mono" style={{ fontSize: '20px', fontWeight: '900', marginBottom: '10px' }}>LINK DEVICE</h3>
                 <p style={{ color: '#323245', fontSize: '13px', marginBottom: '35px' }}>Enter the 7-character code shown in Settings → Mobile.</p>
@@ -99,7 +99,7 @@ export default function MobileConnect() {
                         type="text" 
                         value={pairingCode}
                         onChange={(e) => setPairingCode(e.target.value)}
-                        placeholder="MZE-XXXX"
+                        placeholder="PRS-XXXX"
                         className="mono"
                         style={{ 
                             width: '100%', background: '#0A0A0E', border: `1px solid ${error ? '#ff4757' : '#1A1A24'}`,
