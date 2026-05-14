@@ -19,13 +19,9 @@ export default async function handler(req, res) {
             return res.status(500).json({ message: 'MISSING_SERVICE_ROLE_KEY' });
         }
 
-        // [FORCE UPDATE] Using the new project credentials directly
-        const _s1 = 'sb_secret_eXaDCbLnEibNIh';
-        const _s2 = 'HDJNpgfA_UTYNrYFR';
-        const supabaseAdmin = createClient(
-            'https://vznnsmttxahqzfephkse.supabase.co',
-            _s1 + _s2
-        );
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
         const { data, error } = await supabaseAdmin
             .from('licenses')

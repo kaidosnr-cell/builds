@@ -2,18 +2,15 @@ import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-const PRIVATE_KEY = process.env.AUTH_PRIVATE_KEY || 'PRESTIGE-SECRET-KEY-2026'; 
-const INTEGRITY_SALT = 'PRESTIGE-INTEGRITY-2026';
-
-// Use SERVICE_ROLE_KEY to bypass RLS for all auth actions
-const _k1 = 'sb_secret_eXaDCbLnEibNIh';
-const _k2 = 'HDJNpgfA_UTYNrYFR';
-const supabaseAdmin = createClient(
-    'https://vznnsmttxahqzfephkse.supabase.co',
-    _k1 + _k2
-);
-
+const PRIVATE_KEY = process.env.AUTH_PRIVATE_KEY || process.env.JWT_SECRET || 'PRESTIGE-SECRET-SERVER-KEY-2026';
 const SCRAMBLE_KEY = "PRESTIGE-NET-SEC-2026";
+
+function getSupabase() {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+}
 
 function unscramble(input) {
     try {
@@ -38,24 +35,76 @@ function scramble(data) {
     return scrambled.toString('base64');
 }
 
-async function logToDatabase(username, action, details) {
+async function sendWebhook(title, description, color = 0x8376FC) {
+    const webhookUrl = process.env.SECURITY_WEBHOOK;
+    if (!webhookUrl) return;
+
     try {
-        // Attempt to log to activity_logs if it exists
+        await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                embeds: [{
+                    title: `🛡️ Prestige Security: ${title}`,
+                    description: description,
+                    color: color,
+                    timestamp: new Date().toISOString(),
+                    footer: { text: 'Mooze V2 Infrastructure' }
+                }]
+            })
+        });
+    } catch (e) { console.error('Webhook failed', e); }
+}
+
+async function getIPInfo(req) {
+    let ip = 'unknown';
+    let vpnFlag = '';
+    if (req) {
+        ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+        if (ip.includes(',')) ip = ip.split(',')[0].trim();
+        
+        try {
+            const geoRes = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,proxy,hosting`);
+            if (geoRes.ok) {
+                const geo = await geoRes.json();
+                if (geo.status === 'success') {
+                    vpnFlag = ` [${geo.country}${geo.proxy || geo.hosting ? ' | VPN/HOST' : ''}]`;
+                }
+            }
+        } catch { }
+    }
+    return { ip, vpnFlag };
+}
+
+async function logToDatabase(username, action, details, ipInfo = null) {
+    try {
+        const supabaseAdmin = getSupabase();
+        if (!supabaseAdmin) return;
+
+        const { ip, vpnFlag } = ipInfo || { ip: 'unknown', vpnFlag: '' };
+
         await supabaseAdmin.from('activity_logs').insert({
             license_key: username,
             action: action,
-            details: details,
-            created_at: new Date().toISOString()
+            details: details + vpnFlag + (ip !== 'unknown' ? ` | IP: ${ip}` : '')
         });
-    } catch (e) { console.error('Log failed', e); }
+    } catch (err) {
+        console.error('[Logger Error]', err);
+    }
 }
 
 export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
-        // Log RAW request arrival
-        await logToDatabase('anonymous', 'RAW_REQUEST', `Headers: ${JSON.stringify(req.headers['user-agent'])}`);
+        const supabaseAdmin = getSupabase();
+        if (!supabaseAdmin) {
+            return res.status(500).json({ 
+                status: 'error', 
+                message: 'CONFIG_ERROR', 
+                details: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment' 
+            });
+        }
 
         let body = req.body;
         if (body.p) {
@@ -79,13 +128,16 @@ export default async function handler(req, res) {
             case 'login_loader':
                 if (!username) return res.status(400).json({ status: 'error', message: 'USERNAME_REQUIRED' });
                 
-                await logToDatabase(username, 'LOGIN_ATTEMPT', 'Loader login initiated on vznnsmttxahqzfephkse');
+                const ipInfo = await getIPInfo(req);
+                const { ip, vpnFlag } = ipInfo;
+
+                await logToDatabase(username, 'LOGIN_ATTEMPT', 'Attempting login', ipInfo);
 
                 // 1. Search in 'users' table first (Website Accounts)
                 let { data: user, error: userError } = await supabaseAdmin
                     .from('users')
                     .select('*')
-                    .or(`username.ilike."${username}",license_key.ilike."${username}"`)
+                    .or(`username.ilike.${username},license_key.ilike.${username}`)
                     .single();
 
                 // 2. Fallback to 'licenses' table if not found (Legacy/Direct Keys)
@@ -93,28 +145,54 @@ export default async function handler(req, res) {
                     const { data: license, error: licError } = await supabaseAdmin
                         .from('licenses')
                         .select('*')
-                        .or(`username.ilike."${username}",key.ilike."${username}"`)
+                        .or(`username.ilike.${username},key.ilike.${username}`)
                         .single();
                     user = license;
                     // Map legacy 'key' to 'license_key' for consistency
                     if (user) user.license_key = user.key;
                 }
+                
+                const logIdentity = user ? (user.license_key || user.key) : username;
 
                 if (!user) {
                     await logToDatabase(username, 'LOGIN_FAIL', 'User not found in any table');
                     return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
                 
-                // Check subscription status (Website uses owns_cheat, legacy might not)
-                if (user.owns_cheat === 0) {
-                    await logToDatabase(username, 'LOGIN_FAIL', 'No active subscription');
+                // Check subscription status
+                const isActive = user.is_active !== false && user.status !== 'DISABLED';
+                const hasSubscription = user.owns_cheat === 1 || user.license_key || user.key;
+
+                if (!isActive || !hasSubscription) {
+                    await logToDatabase(logIdentity, 'LOGIN_FAIL', `Account inactive or no sub. Active: ${isActive}, Sub: ${hasSubscription}`, req);
                     return res.status(403).json({ status: 'error', message: 'NO_ACTIVE_SUBSCRIPTION' });
                 }
 
-                // Update HWID if not set
-                if (!user.hwid && hwid) {
-                    const table = user.license_key ? 'users' : 'licenses'; // Rough guess for update
-                    await supabaseAdmin.from(table).update({ hwid }).eq('id', user.id);
+                await logToDatabase(logIdentity, 'LOGIN_SUCCESS', 'Successful login via loader', req);
+
+                // Update HWID and IP if they changed
+                if ((!user.hwid && hwid) || (user.ip !== ip)) {
+                    const table = user.license_key ? 'users' : 'licenses';
+                    const updates = {};
+                    if (!user.hwid && hwid) updates.hwid = hwid;
+                    
+                    if (user.ip && user.ip !== ip && ip !== 'unknown') {
+                        updates.ip = ip;
+                        await sendWebhook('IP Change Detected', 
+                            `**User:** ${user.username}\n` +
+                            `**Key:** \`${user.license_key || user.key}\`\n` +
+                            `**Old IP:** \`${user.ip}\`\n` +
+                            `**New IP:** \`${ip}\`\n` +
+                            `**Status:** ${vpnFlag.includes('VPN') ? '⚠️ VPN/Proxy Active' : '✅ Residential'}`, 
+                            0xFF4C4C // Red
+                        );
+                    } else if (!user.ip && ip !== 'unknown') {
+                        updates.ip = ip;
+                    }
+
+                    if (Object.keys(updates).length > 0) {
+                        await supabaseAdmin.from(table).update(updates).eq('id', user.id);
+                    }
                 }
 
                 const responseData = {
@@ -134,6 +212,11 @@ export default async function handler(req, res) {
                 });
 
             case 'heartbeat':
+                const { is_injected } = body;
+                if (username) {
+                    const info = await getIPInfo(req);
+                    await logToDatabase(username, 'HEARTBEAT', `Status: ${is_injected ? 'INJECTED' : 'IDLE'}`, info);
+                }
                 return res.status(200).json({ status: 'success' });
 
             default:
