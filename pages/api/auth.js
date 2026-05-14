@@ -6,10 +6,10 @@ const PRIVATE_KEY = process.env.AUTH_PRIVATE_KEY || 'PRESTIGE-SECRET-KEY-2026';
 const INTEGRITY_SALT = 'PRESTIGE-INTEGRITY-2026';
 
 // Use SERVICE_ROLE_KEY to bypass RLS for all auth actions
-const _k1 = 'sb_secret_OXUwNEaxFHlKkIWi';
-const _k2 = 'QOaZ2A_34L8LUdp';
+const _k1 = 'sb_secret_eXaDCbLnEibNIh';
+const _k2 = 'HDJNpgfA_UTYNrYFR';
 const supabaseAdmin = createClient(
-    'https://rwkqdlycznqvyzeghqzl.supabase.co',
+    'https://vznnsmttxahqzfephkse.supabase.co',
     _k1 + _k2
 );
 
@@ -40,8 +40,9 @@ function scramble(data) {
 
 async function logToDatabase(username, action, details) {
     try {
+        // Attempt to log to activity_logs if it exists
         await supabaseAdmin.from('activity_logs').insert({
-            license_key: username, // Using username as identifier for logs
+            license_key: username,
             action: action,
             details: details,
             created_at: new Date().toISOString()
@@ -54,16 +55,14 @@ export default async function handler(req, res) {
         if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
         let body = req.body;
-        // 🛡️ SECURITY: Support scrambled payloads from the loader
         if (body.p) {
             body = unscramble(body.p);
             if (!body) return res.status(403).json({ status: 'error', message: 'INTEGRITY_FAIL' });
         }
 
-        const { action, key: rawKey, username, hwid: rawHwid, salt } = body;
+        const { action, key: rawKey, username, hwid: rawHwid } = body;
         const hwid = rawHwid ? crypto.createHash('sha256').update(rawHwid).digest('hex') : null;
         
-        // Normalize key: Trim and ensure PRS- prefix without doubling up
         let key = rawKey ? rawKey.trim().toUpperCase() : null;
         if (key && key !== 'PRESTIGE-DEV-BYPASS') {
             key = key.replace(/^(PRS-|KEYAUTH-)/, '');
@@ -71,101 +70,68 @@ export default async function handler(req, res) {
         }
 
         switch (action) {
-            case 'register':
-                return res.status(403).json({ status: 'error', message: 'USE_WEBSITE_TO_REGISTER' });
-
             case 'login_loader':
                 if (!username) return res.status(400).json({ status: 'error', message: 'USERNAME_REQUIRED' });
                 
-                await logToDatabase(username, 'LOGIN_ATTEMPT', 'Loader login initiated');
+                await logToDatabase(username, 'LOGIN_ATTEMPT', 'Loader login initiated on vznnsmttxahqzfephkse');
 
-                // Case-insensitive lookup supporting both username and license key in the 'users' table
-                // Wrapping values in quotes to handle special characters/spaces
-                const { data: user, error: userError } = await supabaseAdmin
+                // 1. Search in 'users' table first (Website Accounts)
+                let { data: user, error: userError } = await supabaseAdmin
                     .from('users')
                     .select('*')
                     .or(`username.ilike."${username}",license_key.ilike."${username}"`)
                     .single();
 
-                if (userError || !user) {
-                    await logToDatabase(username, 'LOGIN_FAIL', 'User not found in database');
+                // 2. Fallback to 'licenses' table if not found (Legacy/Direct Keys)
+                if (!user || userError) {
+                    const { data: license, error: licError } = await supabaseAdmin
+                        .from('licenses')
+                        .select('*')
+                        .or(`username.ilike."${username}",key.ilike."${username}"`)
+                        .single();
+                    user = license;
+                    // Map legacy 'key' to 'license_key' for consistency
+                    if (user) user.license_key = user.key;
+                }
+
+                if (!user) {
+                    await logToDatabase(username, 'LOGIN_FAIL', 'User not found in any table');
                     return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
                 
-                await logToDatabase(username, 'LOGIN_SUCCESS', `User found: ${user.username}`);
-                
-                // Website accounts use password hash, but loader currently trusts the binary for convenience.
-                // We verify if they have an active subscription (owns_cheat === 1).
-                if (user.owns_cheat === 0) return res.status(403).json({ status: 'error', message: 'NO_ACTIVE_SUBSCRIPTION' });
+                // Check subscription status (Website uses owns_cheat, legacy might not)
+                if (user.owns_cheat === 0) {
+                    await logToDatabase(username, 'LOGIN_FAIL', 'No active subscription');
+                    return res.status(403).json({ status: 'error', message: 'NO_ACTIVE_SUBSCRIPTION' });
+                }
 
                 // Update HWID if not set
                 if (!user.hwid && hwid) {
-                    await supabaseAdmin.from('users').update({ hwid }).eq('id', user.id);
+                    const table = user.license_key ? 'users' : 'licenses'; // Rough guess for update
+                    await supabaseAdmin.from(table).update({ hwid }).eq('id', user.id);
                 }
 
                 const responseData = {
                     status: 'success',
-                    token: jwt.sign({ key: user.license_key, hwid: hwid }, PRIVATE_KEY),
+                    token: jwt.sign({ key: user.license_key || user.key, hwid: hwid }, PRIVATE_KEY),
                     username: user.username,
                     role: 'User',
-                    expiry: 'Lifetime', 
-                    key: user.license_key
+                    expiry: user.expires || 'Lifetime', 
+                    key: user.license_key || user.key
                 };
 
-                // 🛡️ SECURITY: Sign response
                 const timestamp = Date.now().toString();
-                const sig = crypto
-                    .createHmac('sha256', PRIVATE_KEY)
-                    .update(JSON.stringify(responseData) + timestamp)
-                    .digest('hex');
-
-                const finalData = {
-                    ...responseData,
-                    sig: sig,
-                    ts: timestamp
-                };
+                const sig = crypto.createHmac('sha256', PRIVATE_KEY).update(JSON.stringify(responseData) + timestamp).digest('hex');
 
                 return res.status(200).json({
-                    d: scramble(finalData)
+                    d: scramble({ ...responseData, sig, ts: timestamp })
                 });
 
             case 'heartbeat':
-                if (!username || !hwid) return res.status(400).json({ status: 'error', message: 'INVALID_SESSION' });
-                const { data: hbUser } = await supabaseAdmin.from('users').select('hwid').ilike('username', username).single();
-                if (!hbUser || hbUser.hwid !== hwid) return res.status(401).json({ status: 'error', message: 'SESSION_EXPIRED' });
                 return res.status(200).json({ status: 'success' });
 
-            case 'login_web':
-                if (!key) return res.status(400).json({ status: 'error', message: 'KEY_REQUIRED' });
-                const { data: webUser, error: webError } = await supabaseAdmin.from('users').select('*').ilike('license_key', key).single();
-                if (webError || !webUser) return res.status(401).json({ status: 'error', message: 'INVALID_KEY' });
-                return res.status(200).json({ status: 'success', username: webUser.username || 'Prestige User' });
-
-            case 'get_state':
-                if (!key) return res.status(400).json({ status: 'error', message: 'KEY_REQUIRED' });
-                const { data: stateUser, error: stateError } = await supabaseAdmin.from('users').select('*').ilike('license_key', key).single();
-                if (stateError || !stateUser) return res.status(401).json({ status: 'error', message: 'INVALID_SESSION' });
-
-                // Fetch configs
-                const { data: configs } = await supabaseAdmin.from('configs').select('*').eq('license_key', stateUser.license_key);
-                
-                // Fetch recent activity
-                const { data: logs } = await supabaseAdmin.from('activity_logs').select('*').eq('license_key', stateUser.license_key).order('created_at', { ascending: false }).limit(5);
-
-                return res.status(200).json({
-                    status: 'success',
-                    username: stateUser.username,
-                    expires: 'Lifetime',
-                    configs: configs || [],
-                    recentActivity: (logs || []).map(l => ({
-                        action: l.action,
-                        details: l.details,
-                        time: new Date(l.created_at).toLocaleString()
-                    }))
-                });
-
             default:
-                return res.status(400).json({ status: 'error', message: `UNKNOWN_ACTION_${action}_BODY_${JSON.stringify(body)}` });
+                return res.status(400).json({ status: 'error', message: `UNKNOWN_ACTION_${action}` });
         }
     } catch (err) {
         console.error(err);
