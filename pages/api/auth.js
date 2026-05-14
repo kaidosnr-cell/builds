@@ -76,7 +76,14 @@ export default async function handler(req, res) {
 
             case 'login_loader':
                 if (!username) return res.status(400).json({ status: 'error', message: 'USERNAME_REQUIRED' });
-                const { data: user, error: userError } = await supabaseAdmin.from('licenses').select('*').eq('username', username).single();
+                
+                // Case-insensitive lookup supporting both username and license key
+                const { data: user, error: userError } = await supabaseAdmin
+                    .from('licenses')
+                    .select('*')
+                    .or(`username.ilike.${username},key.ilike.${username}`)
+                    .single();
+
                 if (userError || !user) return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 if (user.hwid && user.hwid !== hwid) return res.status(403).json({ status: 'error', message: 'HWID_MISMATCH' });
 
