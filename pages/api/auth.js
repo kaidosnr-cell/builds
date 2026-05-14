@@ -54,17 +54,19 @@ export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
+        // Log RAW request arrival
+        await logToDatabase('anonymous', 'RAW_REQUEST', `Headers: ${JSON.stringify(req.headers['user-agent'])}`);
+
         let body = req.body;
         if (body.p) {
             body = unscramble(body.p);
-            if (!body) return res.status(403).json({ status: 'error', message: 'INTEGRITY_FAIL' });
+            if (!body) {
+                await logToDatabase('anonymous', 'SCRAMBLE_FAIL', `Input length: ${req.body?.p?.length}`);
+                return res.status(403).json({ status: 'error', message: 'INTEGRITY_FAIL' });
+            }
         }
 
         const { action, key: rawKey, username, hwid: rawHwid } = body;
-        
-        // Log EVERY request for debugging
-        await logToDatabase(username || 'anonymous', 'REQUEST_RECEIVED', `Action: ${action} | RawKey: ${rawKey}`);
-
         const hwid = rawHwid ? crypto.createHash('sha256').update(rawHwid).digest('hex') : null;
         
         let key = rawKey ? rawKey.trim().toUpperCase() : null;
