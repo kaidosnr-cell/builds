@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         
         // Normalize key: Trim and ensure PRS- prefix without doubling up
         let key = rawKey ? rawKey.trim().toUpperCase() : null;
-        if (key) {
+        if (key && key !== 'PRESTIGE-DEV-BYPASS') {
             // Remove any existing PRS- or KEYAUTH- prefix first
             key = key.replace(/^(PRS-|KEYAUTH-)/, '');
             // Then ensure it has the PRS- prefix
@@ -65,10 +65,25 @@ export default async function handler(req, res) {
         switch (action) {
             case 'register':
                 if (!key || !username) return res.status(400).json({ status: 'error', message: 'KEY_AND_USER_REQUIRED' });
+                
                 // Case-insensitive license lookup
-                const { data: license, error: fetchError } = await supabaseAdmin.from('licenses').select('*').ilike('key', key).single();
+                let { data: license, error: fetchError } = await supabaseAdmin.from('licenses').select('*').ilike('key', key).single();
+                
+                // 🛠️ DEV BYPASS: If dev key doesn't exist, create it on the fly
+                if ((fetchError || !license) && key === 'PRESTIGE-DEV-BYPASS') {
+                    const { data: newKey, error: createError } = await supabaseAdmin.from('licenses').insert({
+                        key: 'PRESTIGE-DEV-BYPASS',
+                        expires: 'Lifetime',
+                        username: username,
+                        hwid: hwid
+                    }).select().single();
+                    
+                    if (createError) return res.status(500).json({ status: 'error', message: 'DEV_KEY_AUTO_GEN_FAIL' });
+                    return res.status(200).json({ status: 'success', message: 'DEV_ACCOUNT_REGISTERED' });
+                }
+
                 if (fetchError || !license) return res.status(401).json({ status: 'error', message: 'INVALID_LICENSE_KEY' });
-                if (license.hwid) return res.status(403).json({ status: 'error', message: 'KEY_ALREADY_REDEEMED' });
+                if (license.hwid && license.hwid !== hwid) return res.status(403).json({ status: 'error', message: 'KEY_ALREADY_REDEEMED' });
 
                 const { error: updateError } = await supabaseAdmin.from('licenses').update({ username: username, hwid: hwid }).ilike('key', key);
                 if (updateError) return res.status(500).json({ status: 'error', message: 'REGISTRATION_FAILED' });
