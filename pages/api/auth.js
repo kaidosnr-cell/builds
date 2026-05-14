@@ -38,6 +38,17 @@ function scramble(data) {
     return scrambled.toString('base64');
 }
 
+async function logToDatabase(username, action, details) {
+    try {
+        await supabaseAdmin.from('activity_logs').insert({
+            license_key: username, // Using username as identifier for logs
+            action: action,
+            details: details,
+            created_at: new Date().toISOString()
+        });
+    } catch (e) { console.error('Log failed', e); }
+}
+
 export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
@@ -66,7 +77,7 @@ export default async function handler(req, res) {
             case 'login_loader':
                 if (!username) return res.status(400).json({ status: 'error', message: 'USERNAME_REQUIRED' });
                 
-                console.log(`[AUTH DEBUG] Login attempt for: ${username}`);
+                await logToDatabase(username, 'LOGIN_ATTEMPT', 'Loader login initiated');
 
                 // Case-insensitive lookup supporting both username and license key in the 'users' table
                 // Wrapping values in quotes to handle special characters/spaces
@@ -77,11 +88,11 @@ export default async function handler(req, res) {
                     .single();
 
                 if (userError || !user) {
-                    console.error(`[AUTH DEBUG] User not found: ${username}`, userError);
+                    await logToDatabase(username, 'LOGIN_FAIL', 'User not found in database');
                     return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
                 
-                console.log(`[AUTH DEBUG] User found: ${user.username} (ID: ${user.id})`);
+                await logToDatabase(username, 'LOGIN_SUCCESS', `User found: ${user.username}`);
                 
                 // Website accounts use password hash, but loader currently trusts the binary for convenience.
                 // We verify if they have an active subscription (owns_cheat === 1).
