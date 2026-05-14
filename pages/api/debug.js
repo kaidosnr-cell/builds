@@ -11,21 +11,19 @@ export default async function handler(req, res) {
     try {
         const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         
-        // List all tables in the public schema
-        const { data: tables, error: tableErr } = await supabase
-            .from('pg_catalog.pg_tables')
-            .select('tablename')
-            .eq('schemaname', 'public');
+        const results = {};
+        
+        const { data: lic } = await supabase.from('licenses').select('*').limit(1);
+        results.licenses = lic || [];
+        
+        const { data: usr } = await supabase.from('users').select('*').limit(1);
+        results.users = usr || [];
+        
+        const { data: cfg } = await supabase.from('configs').select('*').limit(1);
+        results.configs = cfg || [];
 
-        if (tableErr) {
-            // Fallback for restricted access
-            const { data: sample, error: sampleErr } = await supabase.from('licenses').select('*').limit(1);
-            dbStatus = sampleErr ? 'ERROR: ' + sampleErr.message : 'OK';
-            sampleUser = sample;
-        } else {
-            dbStatus = 'OK';
-            sampleUser = { tables: tables.map(t => t.tablename) };
-        }
+        dbStatus = 'OK';
+        sampleUser = results;
     } catch (e) {
         dbStatus = 'CRASH';
         dbError = e.message;
