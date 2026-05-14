@@ -169,16 +169,18 @@ export default async function handler(req, res) {
                     return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
                 
+                const logIdentity = user.license_key || user.key || username;
+                
                 // Check subscription status
                 const isActive = user.is_active !== false && user.status !== 'DISABLED';
                 const hasSubscription = user.owns_cheat === 1 || user.license_key || user.key;
 
                 if (!isActive || !hasSubscription) {
-                    await logToDatabase(logIdentity, 'LOGIN_FAIL', `Account inactive or no sub. Active: ${isActive}, Sub: ${hasSubscription}`, req);
+                    await logToDatabase(logIdentity, 'LOGIN_FAIL', `Account inactive or no sub. Active: ${isActive}, Sub: ${hasSubscription}`, ipInfo);
                     return res.status(403).json({ status: 'error', message: 'NO_ACTIVE_SUBSCRIPTION' });
                 }
 
-                await logToDatabase(logIdentity, 'LOGIN_SUCCESS', 'Successful login via loader', req);
+                await logToDatabase(logIdentity, 'LOGIN_SUCCESS', 'Successful login via loader', ipInfo);
 
                 // Update HWID and IP if they changed
                 if ((!user.hwid && hwid) || (user.ip !== ip)) {
