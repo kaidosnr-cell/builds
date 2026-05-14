@@ -181,9 +181,8 @@ export default async function handler(req, res) {
                 }
 
                 if (!user) {
-                    const activeKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'MISSING';
-                    await logToDatabase(username, 'LOGIN_FAIL', `User not found. Key prefix: ${activeKey.substring(0, 5)}`, ipInfo);
-                    return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND', debug: activeKey.substring(0, 5) });
+                    await logToDatabase(username, 'LOGIN_FAIL', 'User not found in any table', ipInfo);
+                    return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
                 
                 const logIdentity = user.license_key || user.key || username;
