@@ -223,6 +223,48 @@ export default async function handler(req, res) {
                     d: scramble({ ...responseData, sig, ts: timestamp })
                 });
 
+            case 'register':
+                if (!username || !key) return res.status(400).json({ status: 'error', message: 'USERNAME_AND_KEY_REQUIRED' });
+                
+                // 1. Check if key is valid and not already registered
+                const { data: existingKey, error: keyErr } = await supabaseAdmin
+                    .from('licenses')
+                    .select('*')
+                    .eq('key', key)
+                    .single();
+
+                if (keyErr || !existingKey) {
+                    return res.status(404).json({ status: 'error', message: 'INVALID_LICENSE_KEY' });
+                }
+
+                if (existingKey.username && existingKey.username !== 'Prestige User' && existingKey.username !== '') {
+                    return res.status(400).json({ status: 'error', message: 'KEY_ALREADY_REGISTERED' });
+                }
+
+                // 2. Check if username is already taken
+                const { data: nameCheck } = await supabaseAdmin
+                    .from('licenses')
+                    .select('username')
+                    .ilike('username', username)
+                    .single();
+
+                if (nameCheck) {
+                    return res.status(400).json({ status: 'error', message: 'USERNAME_TAKEN' });
+                }
+
+                // 3. Register the key
+                const { error: regErr } = await supabaseAdmin
+                    .from('licenses')
+                    .update({ username: username, hwid: hwid })
+                    .eq('key', key);
+
+                if (regErr) {
+                    return res.status(500).json({ status: 'error', message: 'REGISTRATION_FAILED', details: regErr.message });
+                }
+
+                await logToDatabase(key, 'REGISTER', `User ${username} registered key`, await getIPInfo(req));
+                return res.status(200).json({ status: 'success', message: 'REGISTERED_SUCCESSFULLY' });
+
             case 'heartbeat':
                 const { is_injected } = body;
                 if (username) {
