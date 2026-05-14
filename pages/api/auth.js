@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-const PRIVATE_KEY = process.env.AUTH_PRIVATE_KEY || process.env.JWT_SECRET || 'PRESTIGE-SECRET-SERVER-KEY-2026';
+const PRIVATE_KEY = process.env.AUTH_PRIVATE_KEY || process.env.JWT_SECRET || 'PRESTIGE-SECRET-KEY-2026';
 const SCRAMBLE_KEY = "PRESTIGE-NET-SEC-2026";
 
 function getSupabase() {
@@ -233,7 +233,7 @@ export default async function handler(req, res) {
                 };
 
                 const timestamp = Date.now().toString();
-                const sig = crypto.createHmac('sha256', PRIVATE_KEY).update(JSON.stringify(responseData) + timestamp).digest('hex');
+                const sig = crypto.createHmac('sha256', PRIVATE_KEY).update(responseData.token + timestamp).digest('hex');
 
                 return res.status(200).json({
                     d: scramble({ ...responseData, sig, ts: timestamp })
