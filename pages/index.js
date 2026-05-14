@@ -21,7 +21,8 @@ export default function Home() {
         setActivity(data.recentActivity || []);
         setStats({
             configs: data.configs?.length || 0,
-            expires: data.expires || 'Lifetime'
+            expires: data.expires || 'Lifetime',
+            hwid: data.hwid || null
         });
     });
   }, []);
@@ -61,8 +62,8 @@ export default function Home() {
           justifyContent: 'center',
           boxShadow: '0 10px 30px -10px var(--accent-glow)'
         }}>
-          <h4 style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: '900', marginBottom: '8px', letterSpacing: '2px' }}>SECURE SESSION</h4>
-          <p style={{ fontSize: '18px', fontWeight: '900' }}>VERIFIED</p>
+          <h4 style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: '900', marginBottom: '8px', letterSpacing: '2px' }}>HARDWARE LINK</h4>
+          <p style={{ fontSize: '18px', fontWeight: '900' }}>{stats.hwid ? 'ALREADY SET' : 'NOT LINKED'}</p>
         </div>
       </div>
 

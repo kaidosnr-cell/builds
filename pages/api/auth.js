@@ -348,10 +348,15 @@ export default async function handler(req, res) {
                     .select('*')
                     .eq('license_key', key);
 
+                let expiryLabel = stateUser.expires || 'Lifetime';
+                if (expiryLabel.includes('9999') || expiryLabel.includes('010240') || expiryLabel.startsWith('+')) {
+                    expiryLabel = 'Lifetime';
+                }
+
                 return res.status(200).json({
                     status: stateUser.status || 'ACTIVE',
                     username: stateUser.username || 'Prestige User',
-                    expires: stateUser.expires || 'Lifetime',
+                    expires: expiryLabel,
                     hwid: stateUser.hwid || null,
                     recentActivity: formattedLogs,
                     configs: dbConfigs || [],
