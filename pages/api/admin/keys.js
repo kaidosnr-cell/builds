@@ -30,7 +30,12 @@ export default async function handler(req, res) {
 
         if (error) return res.status(500).json({ message: 'DB_ERROR: ' + error.message });
 
-        return res.status(200).json({ status: 'success', keys: data });
+        const sanitizedKeys = data.map(k => ({
+            ...k,
+            hwid: k.hwid ? 'LINKED' : 'UNLINKED'
+        }));
+
+        return res.status(200).json({ status: 'success', keys: sanitizedKeys });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ status: 'error', message: err.message });

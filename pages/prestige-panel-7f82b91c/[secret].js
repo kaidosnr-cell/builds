@@ -235,6 +235,7 @@ export default function AdminPage({ verifiedSecret }) {
                                 <tr className="border-b border-zinc-800/50">
                                     <th className="pb-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Key</th>
                                     <th className="pb-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">User</th>
+                                    <th className="pb-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Hardware</th>
                                     <th className="pb-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Created</th>
                                     <th className="pb-4 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Status</th>
                                 </tr>
@@ -244,6 +245,7 @@ export default function AdminPage({ verifiedSecret }) {
                                     <tr key={idx} className="group">
                                         <td className="py-4 font-mono text-sm text-purple-400">{k.key}</td>
                                         <td className="py-4 text-xs font-bold text-zinc-300">{k.username || 'UNASSIGNED'}</td>
+                                        <td className="py-4 text-xs font-black text-zinc-500 tracking-tighter">{k.hwid || 'UNLINKED'}</td>
                                         <td className="py-4 text-xs text-zinc-500">{new Date(k.created_at).toLocaleDateString()}</td>
                                         <td className="py-4">
                                             <span className={`text-[9px] font-black px-2 py-1 rounded ${new Date(k.expires) > new Date() ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>

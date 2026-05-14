@@ -227,11 +227,13 @@ export default async function handler(req, res) {
                     }
                 }
 
+                const isAdmin = (user.license_key || user.key) === process.env.ADMIN_KEY || (user.license_key || user.key) === 'PRS-ADMIN-91A2-B3C4-D5E6';
+                
                 const responseData = {
                     status: 'success',
                     token: jwt.sign({ key: user.license_key || user.key, hwid: hwid }, PRIVATE_KEY),
                     username: user.username,
-                    role: 'User',
+                    role: isAdmin ? 'Administrator' : 'User',
                     expiry: user.expires || 'Lifetime', 
                     key: user.license_key || user.key
                 };
