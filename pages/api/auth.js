@@ -76,17 +76,21 @@ async function getIPInfo(req) {
     return { ip, vpnFlag };
 }
 
-async function logToDatabase(username, action, details, ipInfo = null) {
+async function logToDatabase(identifier, action, details, ipInfo = null) {
     try {
         const supabaseAdmin = getSupabase();
         if (!supabaseAdmin) return;
 
         const { ip, vpnFlag } = ipInfo || { ip: 'unknown', vpnFlag: '' };
+        
+        // Only set license_key if the identifier looks like a key (starts with PRS-)
+        const licenseKey = (identifier && identifier.startsWith('PRS-')) ? identifier : null;
 
         await supabaseAdmin.from('activity_logs').insert({
-            license_key: username,
+            license_key: licenseKey,
             action: action,
-            details: details + vpnFlag + (ip !== 'unknown' ? ` | IP: ${ip}` : '')
+            details: `${identifier}: ${details}` + vpnFlag,
+            ip_address: ip
         });
     } catch (err) {
         console.error('[Logger Error]', err);
@@ -151,14 +155,26 @@ export default async function handler(req, res) {
 
                 // 2. Fallback to 'licenses' table (Legacy/Direct Keys)
                 if (!user) {
-                    const { data: license, error: licError } = await supabaseAdmin
+                    // Try by Username first
+                    const { data: byName } = await supabaseAdmin
                         .from('licenses')
                         .select('*')
-                        .or(`username.ilike.${username},key.ilike.${username}`)
-                        .single();
+                        .ilike('username', username)
+                        .maybeSingle();
                     
-                    if (license) {
-                        user = license;
+                    if (byName) {
+                        user = byName;
+                    } else {
+                        // Try by Key
+                        const { data: byKey } = await supabaseAdmin
+                            .from('licenses')
+                            .select('*')
+                            .eq('key', username)
+                            .maybeSingle();
+                        user = byKey;
+                    }
+
+                    if (user) {
                         // Map legacy 'key' to 'license_key' for consistency
                         user.license_key = user.key;
                     }
