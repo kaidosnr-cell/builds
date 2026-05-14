@@ -14,11 +14,43 @@ const supabaseAdmin = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY || (_key_part1 + _key_part2)
 );
 
+const SCRAMBLE_KEY = "PRESTIGE-NET-SEC-2026";
+
+function unscramble(input) {
+    try {
+        const buffer = Buffer.from(input, 'base64');
+        const output = Buffer.alloc(buffer.length);
+        for (let i = 0; i < buffer.length; i++) {
+            output[i] = buffer[i] ^ SCRAMBLE_KEY.charCodeAt(i % SCRAMBLE_KEY.length);
+        }
+        return JSON.parse(output.toString('utf-8'));
+    } catch {
+        return null;
+    }
+}
+
+function scramble(data) {
+    const jsonStr = JSON.stringify(data);
+    const buffer = Buffer.from(jsonStr, 'utf-8');
+    const scrambled = Buffer.alloc(buffer.length);
+    for (let i = 0; i < buffer.length; i++) {
+        scrambled[i] = buffer[i] ^ SCRAMBLE_KEY.charCodeAt(i % SCRAMBLE_KEY.length);
+    }
+    return scrambled.toString('base64');
+}
+
 export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
-        const { action, key: rawKey, username, hwid: rawHwid, salt, payload } = req.body;
+        let body = req.body;
+        // 🛡️ SECURITY: Support scrambled payloads from the loader
+        if (body.p) {
+            body = unscramble(body.p);
+            if (!body) return res.status(403).json({ status: 'error', message: 'INTEGRITY_FAIL' });
+        }
+
+        const { action, key: rawKey, username, hwid: rawHwid, salt } = body;
         const hwid = rawHwid ? crypto.createHash('sha256').update(rawHwid).digest('hex') : null;
         
         // Normalize key: Trim and ensure PRS- prefix without doubling up
@@ -46,10 +78,39 @@ export default async function handler(req, res) {
                 if (!username) return res.status(400).json({ status: 'error', message: 'USERNAME_REQUIRED' });
                 const { data: user, error: userError } = await supabaseAdmin.from('licenses').select('*').eq('username', username).single();
                 if (userError || !user) return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
-                if (user.hwid !== hwid) return res.status(403).json({ status: 'error', message: 'HWID_MISMATCH' });
+                if (user.hwid && user.hwid !== hwid) return res.status(403).json({ status: 'error', message: 'HWID_MISMATCH' });
 
-                const token = jwt.sign({ key: user.key, hwid: hwid }, PRIVATE_KEY);
-                return res.status(200).json({ status: 'success', token, expiry: user.expires, key: user.key });
+                // Update HWID if not set
+                if (!user.hwid && hwid) {
+                    await supabaseAdmin.from('licenses').update({ hwid }).eq('id', user.id);
+                }
+
+                const responseData = {
+                    status: 'success',
+                    token: jwt.sign({ key: user.key, hwid: hwid }, PRIVATE_KEY),
+                    username: user.username,
+                    role: 'User', // Default role for now
+                    expiry: user.expires,
+                    key: user.key
+                };
+
+                // 🛡️ SECURITY: Sign response
+                const timestamp = Date.now().toString();
+                const sig = crypto
+                    .createHmac('sha256', PRIVATE_KEY)
+                    .update(JSON.stringify(responseData) + timestamp)
+                    .digest('hex');
+
+                const finalData = {
+                    ...responseData,
+                    sig: sig,
+                    ts: timestamp
+                };
+
+                // Scramble for the loader
+                return res.status(200).json({
+                    d: scramble(finalData)
+                });
 
             case 'heartbeat':
                 if (!key || !hwid) return res.status(400).json({ status: 'error', message: 'INVALID_SESSION' });
@@ -87,7 +148,7 @@ export default async function handler(req, res) {
                 });
 
             default:
-                return res.status(400).json({ message: 'Unknown Action' });
+                return res.status(400).json({ status: 'error', message: `UNKNOWN_ACTION_${action}_BODY_${JSON.stringify(body)}` });
         }
     } catch (err) {
         console.error(err);
