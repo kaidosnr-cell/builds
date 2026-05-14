@@ -10,13 +10,20 @@ export default async function handler(req, res) {
 
     try {
         const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-        const { data, error } = await supabase.from('licenses').select('username').limit(1);
-        if (error) {
+        
+        // Check for Kaidosnr specifically
+        const { data: specific, error: specErr } = await supabase
+            .from('licenses')
+            .select('*')
+            .ilike('username', 'Kaidosnr')
+            .maybeSingle();
+
+        if (specErr) {
             dbStatus = 'ERROR';
-            dbError = error.message;
+            dbError = specErr.message;
         } else {
             dbStatus = 'OK';
-            sampleUser = data;
+            sampleUser = specific;
         }
     } catch (e) {
         dbStatus = 'CRASH';
