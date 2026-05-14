@@ -133,29 +133,39 @@ export default async function handler(req, res) {
 
                 await logToDatabase(username, 'LOGIN_ATTEMPT', 'Attempting login', ipInfo);
 
-                // 1. Search in 'users' table first (Website Accounts)
-                let { data: user, error: userError } = await supabaseAdmin
-                    .from('users')
-                    .select('*')
-                    .or(`username.ilike.${username},license_key.ilike.${username}`)
-                    .single();
+                let user = null;
+                let userError = null;
 
-                // 2. Fallback to 'licenses' table if not found (Legacy/Direct Keys)
-                if (!user || userError) {
+                // 1. Try 'users' table (Website Accounts) - Safe Check
+                try {
+                    const { data, error } = await supabaseAdmin
+                        .from('users')
+                        .select('*')
+                        .or(`username.ilike.${username},license_key.ilike.${username}`)
+                        .single();
+                    user = data;
+                    userError = error;
+                } catch (e) { 
+                    userError = e; 
+                }
+
+                // 2. Fallback to 'licenses' table (Legacy/Direct Keys)
+                if (!user) {
                     const { data: license, error: licError } = await supabaseAdmin
                         .from('licenses')
                         .select('*')
                         .or(`username.ilike.${username},key.ilike.${username}`)
                         .single();
-                    user = license;
-                    // Map legacy 'key' to 'license_key' for consistency
-                    if (user) user.license_key = user.key;
+                    
+                    if (license) {
+                        user = license;
+                        // Map legacy 'key' to 'license_key' for consistency
+                        user.license_key = user.key;
+                    }
                 }
-                
-                const logIdentity = user ? (user.license_key || user.key) : username;
 
                 if (!user) {
-                    await logToDatabase(username, 'LOGIN_FAIL', 'User not found in any table');
+                    await logToDatabase(username, 'LOGIN_FAIL', 'User not found in any table', ipInfo);
                     return res.status(401).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
                 
