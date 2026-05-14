@@ -327,11 +327,13 @@ export default async function handler(req, res) {
                     return res.status(404).json({ status: 'error', message: 'USER_NOT_FOUND' });
                 }
 
-                // 2. Fetch recent activity (last 5 logs)
+                // 2. Fetch recent activity (last 24 hours, max 5 logs)
+                const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
                 const { data: logs } = await supabaseAdmin
                     .from('activity_logs')
                     .select('*')
                     .eq('license_key', key)
+                    .gt('created_at', oneDayAgo)
                     .order('created_at', { ascending: false })
                     .limit(5);
 
@@ -366,6 +368,40 @@ export default async function handler(req, res) {
                         injected: stateUser.status === 'INJECTED'
                     }
                 });
+
+            case 'verify_pairing':
+                const { pairingCode } = body;
+                if (!pairingCode) return res.status(400).json({ status: 'error', message: 'CODE_REQUIRED' });
+
+                const { data: pairUser, error: pairErr } = await supabaseAdmin
+                    .from('licenses')
+                    .select('*')
+                    .eq('pairing_id', pairingCode.toUpperCase())
+                    .single();
+
+                if (pairErr || !pairUser) {
+                    return res.status(404).json({ status: 'error', message: 'INVALID_PAIRING_CODE' });
+                }
+
+                // Activate mobile link in DB
+                await supabaseAdmin.from('licenses').update({ is_mobile_connected: true }).eq('key', pairUser.key);
+
+                return res.status(200).json({ 
+                    status: 'success', 
+                    key: pairUser.key,
+                    username: pairUser.username 
+                });
+
+            case 'register_pairing':
+                const { pairing_id } = body;
+                if (!key || !pairing_id) return res.status(400).json({ status: 'error', message: 'KEY_AND_PAIRING_ID_REQUIRED' });
+
+                await supabaseAdmin
+                    .from('licenses')
+                    .update({ pairing_id: pairing_id.toUpperCase() })
+                    .eq('key', key.replace(/^(PRS-|KEYAUTH-)/, 'PRS-'));
+
+                return res.status(200).json({ status: 'success' });
 
             default:
                 return res.status(400).json({ status: 'error', message: `UNKNOWN_ACTION_${action}` });

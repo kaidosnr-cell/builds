@@ -35,14 +35,29 @@ export default function MobileConnect() {
     }
   }, [isPaired]);
 
-  const handlePairing = (e) => {
+  const handlePairing = async (e) => {
     e.preventDefault();
-    // In a real app, this would verify with the server/loader
-    if (pairingCode.toUpperCase() === 'PRS-PAIR') {
-        setIsPaired(true);
-        setError('');
-    } else {
-        setError('INVALID_PAIRING_CODE');
+    setLoading(true);
+    setError('');
+
+    try {
+        const res = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'verify_pairing', pairingCode })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            localStorage.setItem('prestige_key', data.key);
+            setIsPaired(true);
+        } else {
+            setError(data.message || 'INVALID_PAIRING_CODE');
+        }
+    } catch (err) {
+        setError('CONNECTION_ERROR');
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -108,7 +123,13 @@ export default function MobileConnect() {
                         }}
                     />
                     {error && <p style={{ color: '#ff4757', fontSize: '11px', fontWeight: '900', marginBottom: '20px' }}>{error}</p>}
-                    <button className="pill-button" style={{ width: '100%', height: '55px' }}>CONNECT DEVICE</button>
+                    <button 
+                        className="pill-button" 
+                        style={{ width: '100%', height: '55px', opacity: loading ? 0.5 : 1 }}
+                        disabled={loading}
+                    >
+                        {loading ? 'CONNECTING...' : 'CONNECT DEVICE'}
+                    </button>
                 </form>
             </div>
         ) : !session.isConnected ? (

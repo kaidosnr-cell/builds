@@ -63,7 +63,7 @@ export default function Home() {
           boxShadow: '0 10px 30px -10px var(--accent-glow)'
         }}>
           <h4 style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: '900', marginBottom: '8px', letterSpacing: '2px' }}>HARDWARE LINK</h4>
-          <p style={{ fontSize: '18px', fontWeight: '900' }}>{stats.hwid ? 'ALREADY SET' : 'NOT LINKED'}</p>
+          <p style={{ fontSize: '18px', fontWeight: '900' }}>{stats.hwid ? 'SET' : 'NOT SET'}</p>
         </div>
       </div>
 
