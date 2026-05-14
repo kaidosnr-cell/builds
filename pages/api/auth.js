@@ -61,6 +61,10 @@ export default async function handler(req, res) {
         }
 
         const { action, key: rawKey, username, hwid: rawHwid } = body;
+        
+        // Log EVERY request for debugging
+        await logToDatabase(username || 'anonymous', 'REQUEST_RECEIVED', `Action: ${action} | RawKey: ${rawKey}`);
+
         const hwid = rawHwid ? crypto.createHash('sha256').update(rawHwid).digest('hex') : null;
         
         let key = rawKey ? rawKey.trim().toUpperCase() : null;
