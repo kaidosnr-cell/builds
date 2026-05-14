@@ -89,8 +89,7 @@ async function logToDatabase(identifier, action, details, ipInfo = null) {
         await supabaseAdmin.from('activity_logs').insert({
             license_key: licenseKey,
             action: action,
-            details: `${identifier}: ${details}` + vpnFlag,
-            ip_address: ip
+            details: `${identifier}: ${details} | IP: ${ip}${vpnFlag}`
         });
     } catch (err) {
         console.error('[Logger Error]', err);
