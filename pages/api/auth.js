@@ -87,6 +87,7 @@ async function logToDatabase(identifier, action, details, ipInfo = null) {
         const licenseKey = (identifier && identifier.startsWith('PRS-')) ? identifier : null;
 
         await supabaseAdmin.from('activity_logs').insert({
+            id: crypto.randomUUID(),
             license_key: licenseKey,
             action: action,
             details: `${identifier}: ${details} | IP: ${ip}${vpnFlag}`
