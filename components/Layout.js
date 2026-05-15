@@ -131,7 +131,7 @@ const Layout = ({ children }) => {
             <img src="/logo.png" style={{ width: '40px', height: '40px', objectFit: 'contain' }} alt="Profile Logo" />
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: '14px', fontWeight: '800', whiteSpace: 'nowrap', color: 'white' }}>{user.toUpperCase()}</div>
-              <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '900', letterSpacing: '1px' }}>ADMINISTRATOR</div>
+              <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '900', letterSpacing: '1px' }}>VERIFIED STATUS</div>
             </div>
           </div>
         </div>

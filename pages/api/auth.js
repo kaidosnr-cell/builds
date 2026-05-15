@@ -227,13 +227,18 @@ export default async function handler(req, res) {
                     }
                 }
 
-                const isAdmin = (user.license_key || user.key) === process.env.ADMIN_KEY || (user.license_key || user.key) === 'PRS-ADMIN-91A2-B3C4-D5E6';
+                const userKey = (user.license_key || user.key);
+                const keyHash = crypto.createHash('sha256').update(userKey).digest('hex');
+                
+                // Master Administrator Hash (Hiding the actual key from source)
+                const ADMIN_HASH = '2b315aa78ec1a91430145f8d535ea2e9ad94aa7b4296325dcaaca191043d012f';
+                const isAdmin = keyHash === ADMIN_HASH;
                 
                 const responseData = {
                     status: 'success',
                     token: jwt.sign({ key: user.license_key || user.key, hwid: hwid }, PRIVATE_KEY),
                     username: user.username,
-                    role: isAdmin ? 'Administrator' : 'User',
+                    role: 'User', // Stealth: Never broadcast admin status in the response JSON
                     expiry: user.expires || 'Lifetime', 
                     key: user.license_key || user.key
                 };
@@ -274,10 +279,27 @@ export default async function handler(req, res) {
                     return res.status(400).json({ status: 'error', message: 'USERNAME_TAKEN' });
                 }
 
-                // 3. Register the key
+                // 3. Calculate Expiry for Pending Keys
+                let newExpiry = existingKey.expires;
+                const expiresDate = new Date(existingKey.expires);
+                
+                // Convention: Year 2000 = 30 Days Pending, Year 2001 = Lifetime Pending
+                if (expiresDate.getFullYear() === 2000) {
+                    const thirtyDays = new Date();
+                    thirtyDays.setDate(thirtyDays.getDate() + 30);
+                    newExpiry = thirtyDays.toISOString();
+                } else if (expiresDate.getFullYear() === 2001) {
+                    newExpiry = '9999-12-31T23:59:59.000Z';
+                }
+
+                // 4. Register the key
                 const { error: regErr } = await supabaseAdmin
                     .from('licenses')
-                    .update({ username: username, hwid: hwid })
+                    .update({ 
+                        username: username, 
+                        hwid: hwid,
+                        expires: newExpiry 
+                    })
                     .eq('key', key);
 
                 if (regErr) {
